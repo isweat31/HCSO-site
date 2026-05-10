@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import {
   Flame,
   Ambulance,
@@ -23,6 +23,7 @@ import {
   ShieldCheck,
   Send,
   Siren,
+  Loader2,
 } from 'lucide-react'
 
 type PageId =
@@ -206,6 +207,18 @@ export default function Home() {
   })
 
   const [mdtStatus, setMdtStatus] = useState('')
+  const [mdtSubmitting, setMdtSubmitting] = useState(false)
+  const [mdtStatusOk, setMdtStatusOk] = useState<boolean | null>(null)
+
+  useEffect(() => {
+    if (mdtStatusOk === true) {
+      const t = setTimeout(() => {
+        setMdtStatus('')
+        setMdtStatusOk(null)
+      }, 4000)
+      return () => clearTimeout(t)
+    }
+  }, [mdtStatusOk])
 
   const goTo = (pageId: PageId) => {
     setActivePage(pageId)
@@ -225,7 +238,9 @@ export default function Home() {
 
   const submitMdtReport = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault()
+    setMdtSubmitting(true)
     setMdtStatus('Submitting report...')
+    setMdtStatusOk(null)
 
     try {
       const response = await fetch('/api/mdt-report', {
@@ -238,10 +253,12 @@ export default function Home() {
 
       if (!response.ok) {
         setMdtStatus(data.error || 'Report failed to submit.')
+        setMdtStatusOk(false)
         return
       }
 
       setMdtStatus('Report submitted to Discord successfully.')
+      setMdtStatusOk(true)
 
       setMdtForm({
         reportType: 'EMS Report',
@@ -257,6 +274,9 @@ export default function Home() {
       })
     } catch {
       setMdtStatus('Report failed to submit.')
+      setMdtStatusOk(false)
+    } finally {
+      setMdtSubmitting(false)
     }
   }
 
@@ -318,6 +338,7 @@ export default function Home() {
       </header>
 
       <main className="relative mx-auto max-w-7xl px-4 py-6 md:px-6 md:py-8">
+        <div key={activePage} className="page-enter">
         {activePage === 'home' && (
           <section className="space-y-6">
             <div className="overflow-hidden rounded-[1.75rem] border border-white/10 bg-[#0d0f14]/90 shadow-2xl shadow-black/40">
@@ -800,7 +821,7 @@ export default function Home() {
               >
                 <div className="grid gap-4 md:grid-cols-2">
                   <label className="space-y-2">
-                    <span className="text-sm font-medium text-zinc-300">Report Type</span>
+                    <span className="text-sm font-medium text-zinc-300">Report Type <span className="text-red-400">*</span></span>
                     <select
                       value={mdtForm.reportType}
                       onChange={(event) => updateMdtField('reportType', event.target.value)}
@@ -815,7 +836,7 @@ export default function Home() {
                   </label>
 
                   <label className="space-y-2">
-                    <span className="text-sm font-medium text-zinc-300">Unit / Callsign</span>
+                    <span className="text-sm font-medium text-zinc-300">Unit / Callsign <span className="text-red-400">*</span></span>
                     <input
                       value={mdtForm.unitCallsign}
                       onChange={(event) => updateMdtField('unitCallsign', event.target.value)}
@@ -825,7 +846,7 @@ export default function Home() {
                   </label>
 
                   <label className="space-y-2">
-                    <span className="text-sm font-medium text-zinc-300">Submitted By</span>
+                    <span className="text-sm font-medium text-zinc-300">Submitted By <span className="text-red-400">*</span></span>
                     <input
                       value={mdtForm.submittedBy}
                       onChange={(event) => updateMdtField('submittedBy', event.target.value)}
@@ -835,7 +856,7 @@ export default function Home() {
                   </label>
 
                   <label className="space-y-2">
-                    <span className="text-sm font-medium text-zinc-300">Incident Location</span>
+                    <span className="text-sm font-medium text-zinc-300">Incident Location <span className="text-red-400">*</span></span>
                     <input
                       value={mdtForm.incidentLocation}
                       onChange={(event) => updateMdtField('incidentLocation', event.target.value)}
@@ -901,7 +922,7 @@ export default function Home() {
                   </label>
 
                   <label className="space-y-2 md:col-span-2">
-                    <span className="text-sm font-medium text-zinc-300">Narrative</span>
+                    <span className="text-sm font-medium text-zinc-300">Narrative <span className="text-red-400">*</span></span>
                     <textarea
                       value={mdtForm.narrative}
                       onChange={(event) => updateMdtField('narrative', event.target.value)}
@@ -915,13 +936,28 @@ export default function Home() {
                 <div className="mt-6 flex flex-wrap items-center gap-3">
                   <button
                     type="submit"
-                    className="inline-flex items-center gap-2 rounded-xl bg-red-600 px-5 py-3 text-sm font-black text-white transition hover:bg-red-500"
+                    disabled={mdtSubmitting}
+                    className="inline-flex items-center gap-2 rounded-xl bg-red-600 px-5 py-3 text-sm font-black text-white shadow-lg shadow-red-950/40 transition hover:bg-red-500 disabled:cursor-not-allowed disabled:opacity-60"
                   >
-                    <Send className="h-4 w-4" />
-                    Submit Report
+                    {mdtSubmitting ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Send className="h-4 w-4" />
+                    )}
+                    {mdtSubmitting ? 'Submitting...' : 'Submit Report'}
                   </button>
 
-                  {mdtStatus ? <p className="text-sm text-zinc-400">{mdtStatus}</p> : null}
+                  {mdtStatus ? (
+                    <p className={`text-sm font-semibold ${
+                      mdtStatusOk === true
+                        ? 'text-emerald-400'
+                        : mdtStatusOk === false
+                        ? 'text-red-400'
+                        : 'text-zinc-400'
+                    }`}>
+                      {mdtStatus}
+                    </p>
+                  ) : null}
                 </div>
               </form>
 
@@ -944,6 +980,7 @@ export default function Home() {
             </div>
           </section>
         )}
+        </div>
       </main>
 
       <footer className="relative border-t border-white/10 bg-[#0b0d11]">
